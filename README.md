@@ -1,5 +1,10 @@
 # ANTLR4 IDE
 
+[![CI](https://github.com/nseba/antlr4-ide/actions/workflows/ci.yml/badge.svg)](https://github.com/nseba/antlr4-ide/actions/workflows/ci.yml)
+[![Release](https://github.com/nseba/antlr4-ide/actions/workflows/release.yml/badge.svg)](https://github.com/nseba/antlr4-ide/actions/workflows/release.yml)
+[![GitHub release](https://img.shields.io/github/v/release/nseba/antlr4-ide)](https://github.com/nseba/antlr4-ide/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A modern, web-based IDE for experimenting with ANTLR4 grammars. Write grammar files, test them against input text, and visualize parse trees in real-time.
 
 ![ANTLR4 IDE](./docs/screenshot.png)
