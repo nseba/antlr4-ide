@@ -2,7 +2,7 @@
 
 A modern, web-based IDE for experimenting with ANTLR4 grammars. Write grammar files, test them against input text, and visualize parse trees in real-time.
 
-![ANTLR4 IDE](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
+![ANTLR4 IDE](./docs/screenshot.png)
 
 ## Features
 
