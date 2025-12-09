@@ -15,6 +15,20 @@ export interface ParseNode {
   children?: ParseNode[];
   token?: Token; // If leaf
   error?: string; // If error node
+  /** Start character index in input text (0-based) */
+  startIndex?: number;
+  /** Stop character index in input text (0-based, inclusive) */
+  stopIndex?: number;
+  /** Start line in input (1-based) */
+  startLine?: number;
+  /** Start column in input (0-based) */
+  startColumn?: number;
+  /** End line in input (1-based) */
+  endLine?: number;
+  /** End column in input (0-based) */
+  endColumn?: number;
+  /** The matched text from the input */
+  matchedText?: string;
 }
 
 export interface ParseError {
@@ -45,4 +59,40 @@ export interface ProjectState {
   settings: {
     startRule: string;
   };
+}
+
+// Re-export analysis types for convenience
+export type {
+  AnalysisResult,
+  AnalysisSummary,
+  RuleInfo,
+  UnusedRule,
+  ComplexityMetrics,
+  PerformanceIssue,
+  AmbiguityHint,
+  AnalysisDecoration,
+  Severity,
+  ComplexityScore,
+  RuleType,
+} from '../services/grammarAnalysis.types';
+
+// Editor ref interface for programmatic control
+export interface CodeEditorRef {
+  selectRange: (startLine: number, startCol: number, endLine: number, endCol: number) => void;
+  highlightRange: (startLine: number, startCol: number, endLine: number, endCol: number, className?: string) => void;
+  clearHighlights: () => void;
+  revealLine: (line: number) => void;
+  setDecorations: (decorations: EditorDecoration[]) => void;
+  clearDecorations: () => void;
+}
+
+// Editor decoration for Monaco
+export interface EditorDecoration {
+  startLine: number;
+  startColumn: number;
+  endLine: number;
+  endColumn: number;
+  severity: 'info' | 'warning' | 'error' | 'critical';
+  message: string;
+  source: string;
 }

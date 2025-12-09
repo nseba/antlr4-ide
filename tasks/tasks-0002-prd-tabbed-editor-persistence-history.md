@@ -1,0 +1,402 @@
+# Tasks: Tabbed Editor, File Persistence & Version History
+
+Generated from: `0002-prd-tabbed-editor-persistence-history.md`
+
+## Relevant Files
+
+### New Files to Create
+
+- `server/routes/files.ts` - Backend REST API for file CRUD operations
+- `server/routes/workspace.ts` - Backend API for workspace state persistence
+- `server/routes/history.ts` - Backend API for version history operations
+- `server/services/fileStorage.ts` - File system storage service with metadata handling
+- `server/services/historyService.ts` - Version history management service
+- `server/types.ts` - Shared TypeScript types for backend
+- `src/services/fileService.ts` - Frontend API client for file operations
+- `src/services/workspaceService.ts` - Frontend API client for workspace state
+- `src/services/historyService.ts` - Frontend API client for version history
+- `src/components/TabBar.tsx` - Tab container with scroll handling and context menu
+- `src/components/Tab.tsx` - Individual tab component with close button and indicators
+- `src/components/HistoryPanel.tsx` - Version history display panel
+- `src/components/DiffViewer.tsx` - Side-by-side diff view component
+- `src/components/SaveStatus.tsx` - Save status indicator component
+- `src/components/Toast.tsx` - Toast notification component
+- `src/hooks/useAutoSave.ts` - Auto-save hook with debouncing
+- `src/hooks/useFileOperations.ts` - Hook for file CRUD operations
+- `src/types/api.ts` - API request/response type definitions
+
+### Files to Modify
+
+- `server/index.ts` - Mount new API routes
+- `src/App.tsx` - Integrate tabs, remove localStorage, add new state management
+- `src/components/TreeVisualizer.tsx` - Enhance node click to open grammar tabs
+- `src/types/index.ts` - Add new type definitions
+- `Dockerfile` - Add data volume and permissions
+- `docker-compose.yml` - Configure persistent volume mapping
+
+### Test Files
+
+- `server/__tests__/fileStorage.test.ts` - Unit tests for file storage service
+- `server/__tests__/historyService.test.ts` - Unit tests for history service
+- `src/services/__tests__/fileService.test.ts` - Unit tests for frontend file service
+
+## Notes
+
+- Test commands: `npm run test`, `npm run lint`, `npm run build`
+- Dev server: `npm run dev` (frontend) + `npx tsx server/index.ts` (backend)
+- Data directory: `./data/projects/` for files, metadata, and history
+- Auto-save debounce: 2 seconds after last change
+- History checkpoints: AI changes + manual saves only (not auto-save)
+
+## Tasks
+
+- [x] 1.0 Implement Backend File Persistence API
+  - [x] 1.1 Create `server/types.ts` with TypeScript interfaces for FileMetadata, VersionEntry, FileHistory, and WorkspaceState
+  - [x] 1.2 Create `server/services/fileStorage.ts` with FileStorageService class implementing:
+    - Constructor that initializes data directory path (configurable via env var, default `./data/projects`)
+    - `ensureDataDir()` method to create directory structure on startup
+    - `listFiles()` method returning array of FileMetadata
+    - `getFile(id)` method returning file content and metadata
+    - `createFile(name, type, content?)` method that generates UUID, creates file and metadata JSON
+    - `updateFile(id, content)` method that updates file and modifiedAt timestamp
+    - `deleteFile(id)` method that removes file, metadata, and history
+    - `getMetadata(id)` method returning just the metadata
+  - [x] 1.3 Create `server/routes/files.ts` with Express router implementing:
+    - `GET /api/files` - List all files (calls fileStorage.listFiles())
+    - `GET /api/files/:id` - Get file content and metadata
+    - `POST /api/files` - Create new file with validation
+    - `PUT /api/files/:id` - Update file content
+    - `DELETE /api/files/:id` - Delete file with confirmation
+  - [x] 1.4 Create `server/routes/workspace.ts` with Express router implementing:
+    - `GET /api/workspace` - Get workspace state (open tabs, active tab, settings)
+    - `PUT /api/workspace` - Update workspace state (partial updates supported)
+    - Workspace stored in `./data/workspace.json`
+  - [x] 1.5 Update `server/index.ts` to:
+    - Import and mount files router at `/api/files`
+    - Import and mount workspace router at `/api/workspace`
+    - Call `fileStorage.ensureDataDir()` on startup
+    - Add error handling middleware for file operations
+  - [x] 1.6 Create `server/__tests__/fileStorage.test.ts` with unit tests for:
+    - File creation with auto-generated UUID
+    - File listing returns correct metadata
+    - File update changes modifiedAt timestamp
+    - File deletion removes all related files
+    - Directory creation on first startup
+  - [x] 1.7 Run linter and verify zero warnings
+  - [x] 1.8 Run full test suite and verify all tests pass (66 tests passing)
+  - [x] 1.9 Build project and verify successful compilation
+  - [ ] 1.10 Manually test API endpoints with curl or REST client
+
+- [x] 2.0 Create Frontend File Service and State Migration
+  - [x] 2.1 Create `src/types/api.ts` with TypeScript interfaces matching backend types:
+    - FileMetadata, VersionEntry, FileHistory, WorkspaceState
+    - API response wrapper types
+    - Error response type
+  - [x] 2.2 Create `src/services/fileService.ts` with async functions:
+    - `fetchFiles()` - GET /api/files, returns FileMetadata[]
+    - `fetchFile(id)` - GET /api/files/:id, returns { metadata, content }
+    - `createFile(name, type, content?)` - POST /api/files
+    - `updateFile(id, content, createCheckpoint?, label?)` - PUT /api/files/:id
+    - `deleteFile(id)` - DELETE /api/files/:id
+    - Error handling with typed errors
+  - [x] 2.3 Create `src/services/workspaceService.ts` with async functions:
+    - `fetchWorkspace()` - GET /api/workspace
+    - `updateWorkspace(partial)` - PUT /api/workspace
+    - Handle 404 for first-time users (return defaults)
+  - [x] 2.4 Create `src/hooks/useAutoSave.ts` hook implementing:
+    - Accepts file ID and content
+    - 2-second debounce after content changes
+    - Returns save status: 'idle' | 'saving' | 'saved' | 'error'
+    - Exposes `lastSaved` timestamp
+    - Handles concurrent saves with queue/cancel
+  - [x] 2.5 Create `src/components/SaveStatus.tsx` component showing:
+    - "Saving..." with spinner during save
+    - "Saved at HH:MM" after successful save
+    - "Save failed - Retry" with click handler on error
+  - [x] 2.6 Update `src/App.tsx` to:
+    - Remove localStorage read/write for files
+    - Add useEffect to fetch files and workspace on mount
+    - Add loading state while fetching initial data
+    - Integrate auto-save hook for active file
+    - Display SaveStatus in header or status bar
+  - [ ] 2.7 Implement localStorage migration in App.tsx:
+    - On mount, check if localStorage has old data
+    - If backend returns empty and localStorage has data, prompt user
+    - Create migration function that POSTs each file to API
+    - Clear localStorage after successful migration
+    - Show migration progress indicator
+  - [ ] 2.8 Create `src/services/__tests__/fileService.test.ts` with unit tests:
+    - Mock fetch calls
+    - Test successful responses
+    - Test error handling
+    - Test retry logic
+  - [x] 2.9 Run linter and verify zero warnings
+  - [x] 2.10 Run full test suite and verify all tests pass (66 tests)
+  - [x] 2.11 Build project and verify successful compilation
+  - [ ] 2.12 Manually test file operations: create, edit, save, reload page
+
+- [x] 3.0 Build Tabbed Editor Interface Components
+  - [x] 3.1 Create `src/components/Tab.tsx` component with props:
+    - `file: FileMetadata` - File info to display
+    - `isActive: boolean` - Whether this tab is selected
+    - `isDirty: boolean` - Whether file has unsaved changes
+    - `onActivate: () => void` - Click handler
+    - `onClose: () => void` - Close button handler
+    - Render: file type icon, filename, dirty indicator (orange dot), close button (X)
+    - Close button visible on hover or when active
+    - Active tab styling: blue underline, brighter text
+  - [x] 3.2 Create `src/components/TabBar.tsx` component with props:
+    - `tabs: FileMetadata[]` - Ordered list of open tabs
+    - `activeTabId: string` - Currently active tab
+    - `dirtyFiles: Set<string>` - Files with unsaved changes
+    - `onTabActivate: (id: string) => void`
+    - `onTabClose: (id: string) => void`
+    - `onTabReorder: (fromIndex: number, toIndex: number) => void`
+    - `onNewFile: () => void`
+    - Implement horizontal scroll with overflow detection
+    - Add scroll buttons when tabs overflow
+    - Add [+] button for new file creation
+  - [x] 3.3 Implement drag-and-drop tab reordering in TabBar:
+    - Use HTML5 drag-and-drop API or react-dnd
+    - Visual feedback during drag (placeholder, opacity change)
+    - Update tab order on drop
+    - Persist new order to workspace
+  - [x] 3.4 Implement tab context menu in Tab.tsx:
+    - Right-click shows menu with: Close, Close Others, Close All, Close to the Right
+    - Use a simple dropdown positioned at click location
+    - Handle each action appropriately
+  - [x] 3.5 Implement unsaved changes prompt:
+    - When closing tab with dirty file, show confirm dialog
+    - Options: Save, Don't Save, Cancel
+    - Save option calls updateFile before closing
+    - Don't Save discards changes and closes
+    - Cancel keeps tab open
+  - [x] 3.6 Update `src/App.tsx` to integrate TabBar:
+    - Add state: `openTabs: string[]` (file IDs in order)
+    - Add state: `dirtyFiles: Set<string>` (files with unsaved changes)
+    - Replace current file header with TabBar component
+    - Implement tab activate/close/reorder handlers
+    - Track dirty state when content changes
+    - Clear dirty state after successful save
+  - [x] 3.7 Implement keyboard shortcuts for tabs:
+    - Ctrl+Tab / Ctrl+Shift+Tab - Next/Previous tab
+    - Ctrl+W - Close current tab
+    - Ctrl+S - Save current file (manual checkpoint)
+    - Add keyboard event listener in App.tsx
+  - [ ] 3.8 Update file explorer sidebar to show open indicator:
+    - Add subtle highlight or dot for files that are open in tabs
+    - Double-click in explorer opens file in new tab (if not already open)
+  - [x] 3.9 Run linter and verify zero warnings
+  - [x] 3.10 Run full test suite and verify all tests pass
+  - [x] 3.11 Build project and verify successful compilation
+  - [x] 3.12 Manually test: open multiple tabs, reorder, close with unsaved changes, keyboard shortcuts
+
+- [x] 4.0 Implement Parse Tree to Editor Navigation
+  - [x] 4.1 Create `src/components/Toast.tsx` notification component:
+    - Props: message, type ('info' | 'warning' | 'error'), duration
+    - Auto-dismiss after duration (default 3 seconds)
+    - Positioned at top-right of screen
+    - Subtle animation for appear/disappear
+  - [x] 4.2 Create toast context/hook for showing notifications:
+    - `useToast()` hook returning `showToast(message, type)` function
+    - Toast container component rendered at app root
+    - Support multiple simultaneous toasts (stack vertically)
+  - [x] 4.3 Update `handleTreeNodeClick` in App.tsx for rule nodes:
+    - Check if grammar file is in openTabs
+    - If not, add grammar file ID to openTabs
+    - Set grammar file as activeTabId
+    - Find rule definition line in grammar content
+    - Call grammarEditorRef.revealLine() and selectRange()
+    - If rule not found, show toast: "Rule definition not found"
+  - [x] 4.4 Update TreeVisualizer click handling to distinguish node types:
+    - Rule nodes (type === 'rule'): trigger grammar navigation
+    - Token nodes (type === 'token'): continue existing input highlighting
+    - Pass node type info to onNodeClick callback
+  - [x] 4.5 Ensure grammar editor ref is available when grammar tab becomes active:
+    - Handle case where grammar tab was just opened (ref not yet assigned)
+    - Use setTimeout or useEffect to wait for editor mount
+    - Queue navigation action if needed
+  - [x] 4.6 Add visual feedback for navigation:
+    - Brief highlight animation on the navigated line
+    - Scroll smoothly to the line (not instant jump)
+  - [x] 4.7 Run linter and verify zero warnings
+  - [x] 4.8 Run full test suite and verify all tests pass
+  - [x] 4.9 Build project and verify successful compilation
+  - [ ] 4.10 Manually test: click rule nodes, verify grammar opens and scrolls correctly
+
+- [x] 5.0 Implement Version History Backend API
+  - [x] 5.1 Create `server/services/historyService.ts` with HistoryService class:
+    - Constructor accepts data directory path
+    - `getHistory(fileId)` - Read and parse {fileId}.history.json, return VersionEntry[]
+    - `addVersion(fileId, content, description, label?)` - Append new version entry
+    - `getVersion(fileId, versionNumber)` - Get specific version content
+    - `restoreVersion(fileId, versionNumber)` - Create new "Restored from vN" entry, return new content
+    - `deleteHistory(fileId)` - Remove history file (called when file deleted)
+    - Auto-increment version numbers starting from 1
+  - [x] 5.2 Create `server/routes/history.ts` with Express router:
+    - `GET /api/files/:id/history` - Get all versions for a file
+    - `POST /api/files/:id/history` - Create manual checkpoint with optional label
+    - `GET /api/files/:id/history/:version` - Get specific version content
+    - `POST /api/files/:id/history/:version/restore` - Restore to version, returns new state
+  - [x] 5.3 Update `server/routes/files.ts` PUT endpoint:
+    - Accept optional `createCheckpoint` and `checkpointLabel` in request body
+    - If createCheckpoint is true, call historyService.addVersion() before saving
+    - Used for AI changes and manual saves that should create history
+  - [x] 5.4 Update `server/index.ts` to mount history routes:
+    - Import history router
+    - Mount at `/api/files/:id/history` (nested under files)
+    - Initialize historyService with same data directory
+  - [x] 5.5 Create initial version when file is created:
+    - In fileStorage.createFile(), also create history with version 1
+    - Description: "Initial version"
+  - [x] 5.6 Update fileStorage.deleteFile() to also delete history:
+    - Call historyService.deleteHistory(fileId)
+    - Ensure atomic operation (both succeed or both fail)
+  - [x] 5.7 Create `server/__tests__/historyService.test.ts` with unit tests:
+    - Adding versions increments version number
+    - Restore creates new version with correct description
+    - History persists across service restarts
+    - Empty history for new files returns empty array
+  - [x] 5.8 Run linter and verify zero warnings
+  - [x] 5.9 Run full test suite and verify all tests pass
+  - [x] 5.10 Build project and verify successful compilation
+  - [ ] 5.11 Manually test history API: create checkpoints, list history, restore
+
+- [x] 6.0 Create Version History UI Panel
+  - [x] 6.1 Create `src/services/historyService.ts` frontend client:
+    - `fetchHistory(fileId)` - GET /api/files/:id/history
+    - `createCheckpoint(fileId, label?)` - POST /api/files/:id/history
+    - `restoreVersion(fileId, version)` - POST /api/files/:id/history/:version/restore
+  - [x] 6.2 Create `src/components/HistoryPanel.tsx` component:
+    - Props: `fileId: string`, `onRestore: (content: string) => void`
+    - Fetch history on mount and when fileId changes
+    - Display file name header with "Save Checkpoint" button
+    - List versions in reverse chronological order (newest first)
+    - Each version shows: version number, relative time, description, optional label
+    - Current version indicator (bullet point or "Current" badge)
+    - "Restore" button for each non-current version
+  - [x] 6.3 Implement version selection in HistoryPanel:
+    - Click version to select it (highlight row)
+    - Show "View Diff" and "Restore" buttons for selected version
+    - Preview pane showing version content (read-only)
+  - [x] 6.4 Create `src/components/DiffViewer.tsx` component:
+    - Props: `oldContent: string`, `newContent: string`, `oldLabel: string`, `newLabel: string`
+    - Use a diff library (e.g., diff or jsdiff) to compute differences
+    - Display side-by-side or unified diff view
+    - Syntax highlighting for grammar files (reuse Monaco or simple highlighter)
+    - Line numbers for both sides
+  - [x] 6.5 Add "View Diff" functionality to HistoryPanel:
+    - Compare selected version with current content
+    - Open DiffViewer in a modal or expanded panel
+    - Close button to return to history list
+  - [x] 6.6 Implement restore confirmation:
+    - When "Restore" clicked, show confirmation dialog
+    - "This will restore version N and create a new checkpoint. Continue?"
+    - On confirm, call restoreVersion API, update editor content
+    - Refresh history list to show new "Restored from vN" entry
+  - [x] 6.7 Update `src/App.tsx` to add History tab:
+    - Add 'history' to activeTab union type
+    - Add History tab button in bottom panel tab bar
+    - Render HistoryPanel when history tab is active
+    - Pass current file ID and restore handler to HistoryPanel
+  - [x] 6.8 Connect "Save Checkpoint" button:
+    - In header or HistoryPanel, add prominent "Save Checkpoint" button
+    - Optional: prompt for label/description
+    - Call createCheckpoint API
+    - Show toast: "Checkpoint saved"
+    - Refresh history list
+  - [x] 6.9 Auto-create checkpoint for AI changes:
+    - When AI modifies a file (future integration point)
+    - Call updateFile with createCheckpoint: true, label: "AI: [description]"
+    - For now, add placeholder comment for future AI integration
+  - [x] 6.10 Run linter and verify zero warnings
+  - [x] 6.11 Run full test suite and verify all tests pass
+  - [x] 6.12 Build project and verify successful compilation
+  - [ ] 6.13 Manually test: create checkpoints, view history, restore versions, view diffs
+
+- [x] 7.0 Update Docker Configuration for Persistent Storage
+  - [x] 7.1 Update `Dockerfile` to create data directory:
+    - Add `RUN mkdir -p /app/data && chown -R node:node /app/data`
+    - Add `VOLUME /app/data` declaration
+    - Ensure node user has write permissions
+  - [x] 7.2 Update `docker-compose.yml` for data persistence:
+    - Add named volume `antlr4lab_data` mapped to `/app/data`
+    - Keep existing `antlr-tmp` volume for ANTLR temp files
+    - Example:
+      ```yaml
+      volumes:
+        - antlr4lab_data:/app/data
+        - antlr-tmp:/app/.antlr-tmp
+      ```
+  - [x] 7.3 Add environment variable for data directory:
+    - In docker-compose.yml: `DATA_DIR=/app/data`
+    - Update fileStorage.ts to read from `process.env.DATA_DIR`
+    - Default to `./data/projects` for local development
+  - [x] 7.4 Update server startup to ensure data directory exists:
+    - Call ensureDataDir() before starting Express server
+    - Log data directory path on startup
+    - Handle permission errors gracefully with clear error message
+  - [x] 7.5 Create seed data for first-time Docker users:
+    - If data directory is empty, create sample grammar and input files
+    - Use the existing INITIAL_GRAMMAR and INITIAL_INPUT content
+    - Create workspace.json with these files open
+  - [ ] 7.6 Test Docker build and volume persistence:
+    - Build image: `docker-compose build`
+    - Start container: `docker-compose up`
+    - Create/modify files through the UI
+    - Stop container: `docker-compose down`
+    - Start again: `docker-compose up`
+    - Verify files persist across restarts
+  - [x] 7.7 Document volume management:
+    - Add comments in docker-compose.yml explaining volume purpose
+    - Note how to backup/restore data volume
+    - Note how to reset to clean state (remove volume)
+  - [x] 7.8 Run linter and verify zero warnings
+  - [x] 7.9 Run full test suite and verify all tests pass
+  - [x] 7.10 Build project and verify successful compilation
+  - [ ] 7.11 Full Docker test: build, run, create files, restart, verify persistence
+
+- [x] 8.0 Integration Testing and Final Polish
+  - [ ] 8.1 End-to-end test: Complete user workflow
+    - Start fresh (no existing data)
+    - Verify sample files are created
+    - Create new grammar and input files
+    - Edit files and verify auto-save
+    - Open multiple tabs, switch between them
+    - Close tabs with unsaved changes (test prompt)
+    - Click parse tree nodes, verify navigation
+    - Create manual checkpoints
+    - Restore from history
+    - Reload page, verify workspace restored
+  - [ ] 8.2 Test localStorage migration:
+    - Clear backend data, populate localStorage with old format
+    - Load app, verify migration prompt appears
+    - Complete migration, verify files in backend
+    - Verify localStorage cleared after migration
+  - [ ] 8.3 Test keyboard shortcuts:
+    - Ctrl+Tab cycles through tabs
+    - Ctrl+W closes current tab
+    - Ctrl+S saves current file (creates checkpoint if enabled)
+    - All shortcuts work across browsers
+  - [ ] 8.4 Test edge cases:
+    - Very long filenames (verify truncation in tabs)
+    - Many open tabs (verify scroll behavior)
+    - Large files (verify performance)
+    - Concurrent edits in multiple browser tabs (last write wins)
+    - Network errors during save (verify retry UI)
+  - [ ] 8.5 Performance verification:
+    - Tab switch latency < 50ms
+    - Auto-save triggers 2 seconds after edit
+    - Save operation < 500ms
+    - History restore < 200ms
+  - [x] 8.6 Update CLAUDE.md with new architecture:
+    - Document file persistence API
+    - Document workspace state management
+    - Document version history system
+    - Document Docker volume configuration
+  - [x] 8.7 Clean up any TODO comments or debug logging
+  - [x] 8.8 Run linter and verify zero warnings
+  - [x] 8.9 Run full test suite and verify all tests pass
+  - [x] 8.10 Build project and verify successful compilation
+  - [ ] 8.11 Final manual testing in production build mode
+  - [ ] 8.12 Create git commit with all changes following commit protocol

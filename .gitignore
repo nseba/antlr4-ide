@@ -26,6 +26,9 @@ dist-ssr
 # ANTLR temp files
 .antlr-tmp
 
+# Data directory (user files, workspace state, history)
+data/
+
 # Environment
 .env
 .env.local

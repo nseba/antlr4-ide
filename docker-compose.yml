@@ -13,7 +13,46 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
+      # Data directory for file persistence (grammar files, input files, history)
+      - DATA_DIR=/app/data
+
+      # =========================================================================
+      # AI Assistant Configuration
+      # =========================================================================
+      # All AI configuration is server-side. The client has no knowledge of
+      # providers, models, or API keys.
+
+      # AI Provider: 'anthropic', 'openai', or 'gemini'
+      - AI_PROVIDER=anthropic
+
+      # Model ID (optional - uses sensible defaults per provider)
+      # Anthropic: claude-sonnet-4-20250514, claude-3-5-sonnet-20241022, claude-3-haiku-20240307
+      # OpenAI: gpt-4o, gpt-4o-mini, gpt-3.5-turbo
+      # Gemini: gemini-1.5-pro, gemini-1.5-flash
+      # - AI_MODEL=claude-sonnet-4-20250514
+
+      # Generation parameters (optional)
+      # - AI_MAX_TOKENS=2048
+      # - AI_TEMPERATURE=0.7
+
+      # API Key for the selected provider (required for AI features)
+      # Set only the key for your selected AI_PROVIDER
+      # Using env_file or Docker secrets is recommended for production
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+
     volumes:
+      # Persistent storage for user files, workspace state, and version history
+      # This volume stores:
+      #   - Grammar files (.g4) and input text files (.txt)
+      #   - File metadata (.meta.json)
+      #   - Version history (.history.json)
+      #   - Workspace state (workspace.json)
+      # To backup: docker cp antlr4-lab-next:/app/data ./backup
+      # To restore: docker cp ./backup/. antlr4-lab-next:/app/data
+      # To reset to clean state: docker-compose down -v && docker-compose up
+      - antlr4lab_data:/app/data
       # Persist ANTLR temp files (optional, for debugging)
       - antlr-tmp:/app/.antlr-tmp
     healthcheck:
@@ -24,4 +63,7 @@ services:
       retries: 3
 
 volumes:
+  # Named volume for persistent user data
+  antlr4lab_data:
+  # Named volume for ANTLR temporary files
   antlr-tmp:

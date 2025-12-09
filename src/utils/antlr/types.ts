@@ -17,6 +17,20 @@ export interface ParseNode {
     children?: ParseNode[];
     token?: Token;
     error?: string;
+    /** Start character index in input text (0-based) */
+    startIndex?: number;
+    /** Stop character index in input text (0-based, inclusive) */
+    stopIndex?: number;
+    /** Start line in input (1-based) */
+    startLine?: number;
+    /** Start column in input (0-based) */
+    startColumn?: number;
+    /** End line in input (1-based) */
+    endLine?: number;
+    /** End column in input (0-based) */
+    endColumn?: number;
+    /** The matched text from the input */
+    matchedText?: string;
 }
 
 export interface LexerCommand {

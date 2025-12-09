@@ -137,12 +137,17 @@ export class JavaParser {
             });
             const tree = this.parseTreeOutput(result);
 
+            // Enrich tree nodes with position info from tokens
+            this.enrichTreeWithPositions(tree, tokens, input);
+
             return {
                 tree,
                 errors: [],
                 tokens,
+                duration: 0,
             };
-        } catch (error: any) {
+        } catch (err) {
+            const error = err as Error;
             console.error('[JavaParser] Error:', error.message);
 
             return {
@@ -159,12 +164,13 @@ export class JavaParser {
                     severity: 'error',
                 }],
                 tokens: [],
+                duration: 0,
             };
         } finally {
             // Cleanup
             try {
                 rmSync(this.workDir, { recursive: true, force: true });
-            } catch (e) {
+            } catch {
                 // Ignore cleanup errors
             }
         }
@@ -317,6 +323,128 @@ export class JavaParser {
     }
 
     /**
+     * Enrich tree nodes with position information from tokens
+     * This matches token text in the tree to actual token objects for position data
+     */
+    private enrichTreeWithPositions(node: ParseNode, tokens: Token[], inputText: string): void {
+        // Build a map of token text to tokens for quick lookup
+        // We use a list since multiple tokens might have the same text
+        const tokensByText = new Map<string, Token[]>();
+        for (const token of tokens) {
+            const existing = tokensByText.get(token.text) || [];
+            existing.push(token);
+            tokensByText.set(token.text, existing);
+        }
+
+        // Track which tokens have been consumed (by index)
+        const consumedTokens = new Set<number>();
+
+        // Recursive function to process nodes
+        const processNode = (n: ParseNode): { startIndex: number; stopIndex: number; startLine: number; startColumn: number; endLine: number; endColumn: number } | null => {
+            if (n.type === 'token') {
+                // For token nodes, find the matching token
+                const tokenText = n.name;
+                const candidates = tokensByText.get(tokenText) || [];
+
+                // Find first unconsumed token with this text
+                for (const token of candidates) {
+                    if (!consumedTokens.has(token.tokenIndex)) {
+                        consumedTokens.add(token.tokenIndex);
+                        n.token = token;
+                        n.startIndex = token.start;
+                        n.stopIndex = token.stop;
+                        n.startLine = token.line;
+                        n.startColumn = token.column;
+                        // Calculate end line/column from stop position
+                        const endPos = this.calculateEndPosition(inputText, token.stop);
+                        n.endLine = endPos.line;
+                        n.endColumn = endPos.column;
+                        n.matchedText = token.text;
+
+                        return {
+                            startIndex: token.start,
+                            stopIndex: token.stop,
+                            startLine: token.line,
+                            startColumn: token.column,
+                            endLine: endPos.line,
+                            endColumn: endPos.column
+                        };
+                    }
+                }
+                return null;
+            }
+
+            if (n.type === 'rule' && n.children && n.children.length > 0) {
+                // For rule nodes, compute span from children
+                let minStart = Number.MAX_SAFE_INTEGER;
+                let maxStop = -1;
+                let startLine = Number.MAX_SAFE_INTEGER;
+                let startColumn = 0;
+                let endLine = -1;
+                let endColumn = 0;
+
+                for (const child of n.children) {
+                    const childSpan = processNode(child);
+                    if (childSpan) {
+                        if (childSpan.startIndex < minStart) {
+                            minStart = childSpan.startIndex;
+                            startLine = childSpan.startLine;
+                            startColumn = childSpan.startColumn;
+                        }
+                        if (childSpan.stopIndex > maxStop) {
+                            maxStop = childSpan.stopIndex;
+                            endLine = childSpan.endLine;
+                            endColumn = childSpan.endColumn;
+                        }
+                    }
+                }
+
+                if (maxStop >= 0) {
+                    n.startIndex = minStart;
+                    n.stopIndex = maxStop;
+                    n.startLine = startLine;
+                    n.startColumn = startColumn;
+                    n.endLine = endLine;
+                    n.endColumn = endColumn;
+                    n.matchedText = inputText.substring(minStart, maxStop + 1);
+
+                    return {
+                        startIndex: minStart,
+                        stopIndex: maxStop,
+                        startLine,
+                        startColumn,
+                        endLine,
+                        endColumn
+                    };
+                }
+            }
+
+            return null;
+        };
+
+        processNode(node);
+    }
+
+    /**
+     * Calculate line and column for a character position in text
+     */
+    private calculateEndPosition(text: string, stopIndex: number): { line: number; column: number } {
+        let line = 1;
+        let column = 0;
+
+        for (let i = 0; i <= stopIndex && i < text.length; i++) {
+            if (text[i] === '\n') {
+                line++;
+                column = 0;
+            } else {
+                column++;
+            }
+        }
+
+        return { line, column };
+    }
+
+    /**
      * Check if Java and the ANTLR jar are available
      */
     static isAvailable(): boolean {
@@ -332,7 +460,7 @@ export class JavaParser {
             readFileSync(jarPath);
 
             return true;
-        } catch (error) {
+        } catch {
             return false;
         }
     }

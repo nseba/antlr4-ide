@@ -46,39 +46,78 @@ Run ESLint to check code quality and style issues.
 
 ## Environment Setup
 
-Create a `.env.local` file with:
-```
-GEMINI_API_KEY=your_api_key_here
+Create a `.env.local` file to configure the AI assistant feature:
+```bash
+# AI Provider Configuration (all server-side)
+AI_PROVIDER=anthropic                        # Provider: 'anthropic', 'openai', or 'gemini'
+AI_MODEL=claude-sonnet-4-20250514           # Model ID (optional, has sensible defaults)
+AI_MAX_TOKENS=2048                           # Max response tokens (optional)
+AI_TEMPERATURE=0.7                           # Generation temperature (optional)
+
+# API Key for the selected provider
+ANTHROPIC_API_KEY=your_anthropic_key_here    # Required if AI_PROVIDER=anthropic
+OPENAI_API_KEY=your_openai_key_here          # Required if AI_PROVIDER=openai
+GEMINI_API_KEY=your_gemini_key_here          # Required if AI_PROVIDER=gemini
 ```
 
-Note: The Gemini API key is referenced in vite.config.ts but may not be actively used by the current ANTLR4 functionality.
+The AI assistant is fully configured server-side. The client only sends chat messages and grammar context - it has no knowledge of providers, models, or API keys.
 
 ## Project Structure
 
 ```
 antlr4-lab-next/
-├── src/                        # All source code
-│   ├── components/             # React components
-│   │   ├── CodeEditor.tsx      # Monaco editor wrapper
-│   │   └── TreeVisualizer.tsx  # D3 parse tree visualization
-│   ├── types/                  # TypeScript type definitions
-│   │   └── index.ts           # Main application types
-│   ├── utils/                  # Utility functions
-│   │   ├── antlr/              # ANTLR4 runtime implementation
-│   │   │   ├── index.ts        # Main parsing orchestration
-│   │   │   ├── GrammarLoader.ts # Grammar file parser
-│   │   │   ├── Validation.ts    # Grammar validation
-│   │   │   ├── LexerAdaptor.ts  # Runtime lexer
-│   │   │   ├── ParserAdaptor.ts # Runtime parser
-│   │   │   └── types.ts         # ANTLR4-specific types
-│   │   └── antlrInterpreter.ts  # Legacy interpreter (not used)
-│   ├── App.tsx                 # Main application component
-│   └── main.tsx                # Application entry point
-├── index.html                  # HTML template
-├── package.json                # Dependencies and scripts
-├── tsconfig.json               # TypeScript configuration
-├── vite.config.ts              # Vite build configuration
-└── CLAUDE.md                   # This file
+├── src/                          # Frontend source code
+│   ├── components/               # React components
+│   │   ├── CodeEditor.tsx        # Monaco editor wrapper
+│   │   ├── TreeVisualizer.tsx    # D3 parse tree visualization
+│   │   ├── TabBar.tsx            # Multi-tab editor interface
+│   │   ├── Tab.tsx               # Individual tab component
+│   │   ├── HistoryPanel.tsx      # Version history panel
+│   │   ├── DiffViewer.tsx        # Side-by-side diff view
+│   │   ├── SaveStatus.tsx        # Auto-save status indicator
+│   │   ├── Toast.tsx             # Toast notification component
+│   │   └── ToastContainer.tsx    # Toast notification container
+│   ├── services/                 # Frontend API clients
+│   │   ├── fileService.ts        # File CRUD operations
+│   │   ├── workspaceService.ts   # Workspace state management
+│   │   └── historyService.ts     # Version history operations
+│   ├── hooks/                    # Custom React hooks
+│   │   ├── useAutoSave.ts        # Auto-save with debouncing
+│   │   └── useToast.ts           # Toast notification management
+│   ├── types/                    # TypeScript type definitions
+│   │   ├── index.ts              # Main application types
+│   │   └── api.ts                # API request/response types
+│   ├── utils/                    # Utility functions
+│   │   ├── antlr/                # ANTLR4 runtime implementation
+│   │   │   ├── index.ts          # Main parsing orchestration
+│   │   │   ├── GrammarLoader.ts  # Grammar file parser
+│   │   │   ├── Validation.ts     # Grammar validation
+│   │   │   ├── LexerAdaptor.ts   # Runtime lexer
+│   │   │   ├── ParserAdaptor.ts  # Runtime parser
+│   │   │   └── types.ts          # ANTLR4-specific types
+│   │   └── antlrInterpreter.ts   # Legacy interpreter (not used)
+│   ├── App.tsx                   # Main application component
+│   └── main.tsx                  # Application entry point
+├── server/                       # Backend Node.js server
+│   ├── index.ts                  # Express server entry point
+│   ├── types.ts                  # Backend type definitions
+│   ├── services/                 # Backend services
+│   │   ├── fileStorage.ts        # File system operations
+│   │   ├── historyService.ts     # Version history management
+│   │   └── workspaceService.ts   # Workspace state service
+│   └── routes/                   # Express API routes
+│       ├── files.ts              # File CRUD endpoints
+│       ├── history.ts            # Version history endpoints
+│       └── workspace.ts          # Workspace state endpoints
+├── data/                         # Persistent storage (local dev)
+│   └── projects/                 # User files, metadata, history
+├── Dockerfile                    # Docker image configuration
+├── docker-compose.yml            # Docker Compose configuration
+├── index.html                    # HTML template
+├── package.json                  # Dependencies and scripts
+├── tsconfig.json                 # TypeScript configuration
+├── vite.config.ts                # Vite build configuration
+└── CLAUDE.md                     # This file
 ```
 
 ## Architecture Overview
@@ -98,22 +137,43 @@ The application uses a modular ANTLR4 runtime implementation located in `src/uti
 
 ### State Management
 
-The app uses React state with localStorage persistence for:
-- **Files**: Grammar files (.g4) and input text files stored in `STORAGE_KEYS.FILES`
-- **Active File ID**: Currently selected file in `STORAGE_KEYS.ACTIVE_ID`
-- **Settings**: Start rule name in `STORAGE_KEYS.SETTINGS`
-- **Layout**: Console height in `STORAGE_KEYS.LAYOUT`
+The app uses a hybrid state management approach:
 
-All state is persisted to localStorage via `useEffect` hooks (App.tsx:167-181).
+**Backend Persistence (Primary)**:
+- **Files**: Grammar files (.g4) and input text files stored via REST API in `./data/projects/`
+- **Workspace**: Open tabs, active tab, settings stored in `workspace.json`
+- **Version History**: Per-file history stored in `{fileId}.history.json`
+
+**Frontend State**:
+- React state for runtime UI state (active tab, parse results, etc.)
+- Auto-save with 2-second debounce via `useAutoSave` hook
+- Toast notifications via `useToast` hook
+
+**LocalStorage (Legacy)**:
+- Layout preferences (console height) in `STORAGE_KEYS.LAYOUT`
+- Legacy file storage keys remain for backward compatibility migration
 
 ### Component Structure
 
-- **`App.tsx`** (605 lines) - Main application container with:
+- **`App.tsx`** - Main application container with:
   - File explorer sidebar (grammars and input files)
+  - TabBar for multi-file editing
   - Monaco editor for editing files
-  - Resizable console panel (tokens and errors)
+  - Resizable bottom panel (Console, Tokens, Analysis, History tabs)
   - Parse tree visualization panel
   - Header with controls (Run, Save, Open, Start Rule input)
+
+- **`TabBar.tsx` / `Tab.tsx`** - Multi-tab editor interface:
+  - Drag-and-drop tab reordering
+  - Context menu (Close, Close Others, Close All)
+  - Unsaved changes indicator (orange dot)
+  - Keyboard shortcuts (Ctrl+Tab, Ctrl+W, Ctrl+S)
+
+- **`HistoryPanel.tsx` / `DiffViewer.tsx`** - Version history system:
+  - View file version history
+  - Create manual checkpoints
+  - Restore to previous versions
+  - View diffs between versions
 
 - **`components/CodeEditor.tsx`** - Monaco editor wrapper with custom ANTLR4 syntax highlighting
   - Registers custom ANTLR4 language mode with Monarch tokenizer
@@ -216,3 +276,89 @@ Lexer fragments are expanded recursively during grammar loading (GrammarLoader.t
 ### Token Skip Rules
 
 Tokens with `-> skip` or `-> channel(HIDDEN)` are automatically filtered during lexing. Common patterns: WS, SKIP, HIDDEN rule names.
+
+## Backend API
+
+The backend server (`server/index.ts`) provides REST API endpoints for file persistence and parsing.
+
+### Starting the Backend
+
+```bash
+# Development (with auto-reload)
+npx tsx server/index.ts
+
+# Backend runs on port 3001 by default
+```
+
+### API Endpoints
+
+**File Operations** (`/api/files`):
+- `GET /api/files` - List all files
+- `GET /api/files/:id` - Get file content and metadata
+- `POST /api/files` - Create new file
+- `PUT /api/files/:id` - Update file content (with optional checkpoint)
+- `DELETE /api/files/:id` - Delete file
+
+**Version History** (`/api/files/:id/history`):
+- `GET /api/files/:id/history` - Get file's version history
+- `POST /api/files/:id/history` - Create manual checkpoint
+- `GET /api/files/:id/history/:version` - Get specific version
+- `POST /api/files/:id/history/:version/restore` - Restore to version
+
+**Workspace** (`/api/workspace`):
+- `GET /api/workspace` - Get workspace state (open tabs, settings)
+- `PUT /api/workspace` - Update workspace state (partial updates)
+
+**Parse** (`/api/parse`):
+- `POST /api/parse` - Parse input with grammar files
+
+### Data Storage
+
+Files are stored in `./data/projects/` (configurable via `DATA_DIR` env var):
+- `{fileId}.g4` or `{fileId}.txt` - File content
+- `{fileId}.meta.json` - File metadata (name, type, timestamps)
+- `{fileId}.history.json` - Version history entries
+- `workspace.json` - Workspace state
+
+## Docker Deployment
+
+### Quick Start
+
+```bash
+# Build and run
+docker-compose up --build
+
+# Access the app
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:3001
+```
+
+### Volume Persistence
+
+User data is stored in a Docker volume for persistence:
+
+```yaml
+volumes:
+  - antlr4lab_data:/app/data  # User files, history, workspace
+  - antlr-tmp:/app/.antlr-tmp # ANTLR temp files
+```
+
+**Volume Management**:
+- **Backup**: `docker cp antlr4-lab-next:/app/data ./backup`
+- **Restore**: `docker cp ./backup/. antlr4-lab-next:/app/data`
+- **Reset**: `docker-compose down -v && docker-compose up`
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NODE_ENV` | `production` | Node environment |
+| `PORT` | `3001` | Backend API port |
+| `DATA_DIR` | `/app/data` | Data storage directory |
+
+### First-Time Startup
+
+On first run with an empty data directory, the server automatically creates:
+- Sample grammar file (`Expr.g4`)
+- Sample input file (`input.txt`)
+- Initial workspace state with both files open
