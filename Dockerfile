@@ -1,4 +1,4 @@
-# Multi-stage build for ANTLR4 Lab Next
+# Multi-stage build for ANTLR4 IDE
 
 # Stage 1: Build the application
 FROM node:20-alpine AS builder

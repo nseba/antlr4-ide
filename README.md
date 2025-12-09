@@ -1,8 +1,8 @@
-# ANTLR4 Lab Next
+# ANTLR4 IDE
 
 A modern, web-based IDE for experimenting with ANTLR4 grammars. Write grammar files, test them against input text, and visualize parse trees in real-time.
 
-![ANTLR4 Lab Next](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
+![ANTLR4 IDE](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
 
 ## Features
 
@@ -26,7 +26,7 @@ A modern, web-based IDE for experimenting with ANTLR4 grammars. Write grammar fi
 ```bash
 # Clone the repository
 git clone <your-repo-url>
-cd antlr4-lab-next
+cd antlr4-ide
 
 # Install dependencies
 npm install
@@ -49,10 +49,10 @@ The production build will be created in the `dist/` directory.
 
 ```bash
 # Build the Docker image
-docker build -t antlr4-lab-next .
+docker build -t antlr4-ide .
 
 # Run the container
-docker run -p 8080:80 antlr4-lab-next
+docker run -p 8080:80 antlr4-ide
 ```
 
 Or use Docker Compose:

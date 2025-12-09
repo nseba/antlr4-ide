@@ -38,11 +38,11 @@ const INITIAL_INPUT = `(10 + 20) * 3`;
 
 // --- Helpers for LocalStorage (for layout persistence only) ---
 const STORAGE_KEYS = {
-  LAYOUT: 'antlr4lab_layout',
+  LAYOUT: 'antlr4ide_layout',
   // Legacy keys for migration
-  FILES: 'antlr4lab_files',
-  ACTIVE_ID: 'antlr4lab_active_id',
-  SETTINGS: 'antlr4lab_settings'
+  FILES: 'antlr4ide_files',
+  ACTIVE_ID: 'antlr4ide_active_id',
+  SETTINGS: 'antlr4ide_settings'
 };
 
 const loadState = <T,>(key: string, fallback: T): T => {
@@ -955,7 +955,7 @@ const App: React.FC = () => {
           <div className="w-6 h-6 bg-ide-accent rounded flex items-center justify-center">
             <span className="font-bold text-white text-xs">A4</span>
           </div>
-          <h1 className="font-semibold text-ide-textActive">ANTLR4 Lab Next</h1>
+          <h1 className="font-semibold text-ide-textActive">ANTLR4 IDE</h1>
           
           <div className="h-4 w-[1px] bg-gray-600 mx-2"></div>
           
@@ -1312,7 +1312,7 @@ const App: React.FC = () => {
              <SaveStatus status={saveStatus} lastSaved={lastSaved} error={saveError} onRetry={saveNow} />
          </div>
          <div className="ml-auto opacity-75">
-             ANTLR4 Lab Next v1.0.0
+             ANTLR4 IDE v1.0.0
          </div>
       </footer>
 

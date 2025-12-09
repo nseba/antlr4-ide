@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ANTLR4 Lab Next is a web-based IDE for experimenting with ANTLR4 grammars. It allows users to write ANTLR4 grammar files, test them against input text, and visualize the resulting parse trees in real-time.
+ANTLR4 IDE is a web-based IDE for experimenting with ANTLR4 grammars. It allows users to write ANTLR4 grammar files, test them against input text, and visualize the resulting parse trees in real-time.
 
 ## Development Commands
 
@@ -65,7 +65,7 @@ The AI assistant is fully configured server-side. The client only sends chat mes
 ## Project Structure
 
 ```
-antlr4-lab-next/
+antlr4-ide/
 ├── src/                          # Frontend source code
 │   ├── components/               # React components
 │   │   ├── CodeEditor.tsx        # Monaco editor wrapper
@@ -339,13 +339,13 @@ User data is stored in a Docker volume for persistence:
 
 ```yaml
 volumes:
-  - antlr4lab_data:/app/data  # User files, history, workspace
+  - antlr4ide_data:/app/data  # User files, history, workspace
   - antlr-tmp:/app/.antlr-tmp # ANTLR temp files
 ```
 
 **Volume Management**:
-- **Backup**: `docker cp antlr4-lab-next:/app/data ./backup`
-- **Restore**: `docker cp ./backup/. antlr4-lab-next:/app/data`
+- **Backup**: `docker cp antlr4-ide:/app/data ./backup`
+- **Restore**: `docker cp ./backup/. antlr4-ide:/app/data`
 - **Reset**: `docker-compose down -v && docker-compose up`
 
 ### Environment Variables

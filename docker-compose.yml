@@ -1,11 +1,11 @@
 version: '3.8'
 
 services:
-  antlr4-lab:
+  antlr4-ide:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: antlr4-lab-next
+    container_name: antlr4-ide
     ports:
       - "3000:3000"  # Frontend
       - "3001:3001"  # Backend API
@@ -49,10 +49,10 @@ services:
       #   - File metadata (.meta.json)
       #   - Version history (.history.json)
       #   - Workspace state (workspace.json)
-      # To backup: docker cp antlr4-lab-next:/app/data ./backup
-      # To restore: docker cp ./backup/. antlr4-lab-next:/app/data
+      # To backup: docker cp antlr4-ide:/app/data ./backup
+      # To restore: docker cp ./backup/. antlr4-ide:/app/data
       # To reset to clean state: docker-compose down -v && docker-compose up
-      - antlr4lab_data:/app/data
+      - antlr4ide_data:/app/data
       # Persist ANTLR temp files (optional, for debugging)
       - antlr-tmp:/app/.antlr-tmp
     healthcheck:
@@ -64,6 +64,6 @@ services:
 
 volumes:
   # Named volume for persistent user data
-  antlr4lab_data:
+  antlr4ide_data:
   # Named volume for ANTLR temporary files
   antlr-tmp:
