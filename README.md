@@ -35,8 +35,29 @@ cd antlr4-ide
 
 # Install dependencies
 npm install
+```
 
-# Start the development server
+### Development Setup
+
+The application requires **two servers** running simultaneously:
+
+1. **Backend Server** (port 3001) - Handles file persistence, parsing, and AI features
+2. **Frontend Server** (port 3000) - Vite dev server for the React application
+
+**Option 1: Start both servers with a single command (recommended):**
+
+```bash
+npm run dev:all
+```
+
+**Option 2: Start servers in separate terminals:**
+
+```bash
+# Terminal 1: Start the backend server
+npm run server
+# or: npx tsx server/index.ts
+
+# Terminal 2: Start the frontend dev server
 npm run dev
 ```
 
@@ -50,27 +71,120 @@ npm run build
 
 The production build will be created in the `dist/` directory.
 
-### Running with Docker
+---
+
+## Docker Deployment
+
+### Using Docker Compose (Recommended)
+
+```bash
+# Start the application
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the application
+docker-compose down
+```
+
+The application will be available at:
+- **Frontend**: `http://localhost:3000`
+- **Backend API**: `http://localhost:3001`
+
+### Using Docker Directly
 
 ```bash
 # Build the Docker image
 docker build -t antlr4-ide .
 
 # Run the container
-docker run -p 8080:80 antlr4-ide
+docker run -d \
+  --name antlr4-ide \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  -v antlr4ide_data:/app/data \
+  -e NODE_ENV=production \
+  -e PORT=3001 \
+  antlr4-ide
 ```
 
-Or use Docker Compose:
+### Data Persistence
+
+User data is stored in a Docker volume:
 
 ```bash
-# Start the application
-docker-compose up -d
+# Backup data
+docker cp antlr4-ide:/app/data ./backup
 
-# Stop the application
-docker-compose down
+# Restore data
+docker cp ./backup/. antlr4-ide:/app/data
+
+# Reset to clean state (removes all user data)
+docker-compose down -v && docker-compose up -d
 ```
 
-The application will be available at `http://localhost:8080`
+---
+
+## Environment Variables
+
+### Core Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NODE_ENV` | `development` | Node environment (`development` or `production`) |
+| `PORT` | `3001` | Backend API port |
+| `DATA_DIR` | `./data` | Data storage directory for files and workspace |
+
+### AI Assistant Configuration
+
+The AI assistant feature requires an API key from one of the supported providers:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AI_PROVIDER` | `anthropic` | AI provider: `anthropic`, `openai`, or `gemini` |
+| `AI_MODEL` | (per provider) | Model ID (optional, uses sensible defaults) |
+| `AI_MAX_TOKENS` | `2048` | Maximum response tokens |
+| `AI_TEMPERATURE` | `0.7` | Generation temperature |
+| `ANTHROPIC_API_KEY` | - | API key for Anthropic (required if `AI_PROVIDER=anthropic`) |
+| `OPENAI_API_KEY` | - | API key for OpenAI (required if `AI_PROVIDER=openai`) |
+| `GEMINI_API_KEY` | - | API key for Google Gemini (required if `AI_PROVIDER=gemini`) |
+
+**Default models per provider:**
+- Anthropic: `claude-sonnet-4-20250514`
+- OpenAI: `gpt-4o`
+- Gemini: `gemini-1.5-pro`
+
+### Local Development Setup
+
+Create a `.env.local` file in the project root:
+
+```bash
+# AI Provider Configuration
+AI_PROVIDER=anthropic
+AI_MODEL=claude-sonnet-4-20250514
+
+# API Key (set only the one for your provider)
+ANTHROPIC_API_KEY=your_key_here
+# OPENAI_API_KEY=your_key_here
+# GEMINI_API_KEY=your_key_here
+```
+
+### Docker Compose Setup
+
+For Docker, you can either:
+
+1. **Use environment variables** (recommended for CI/CD):
+   ```bash
+   ANTHROPIC_API_KEY=your_key docker-compose up -d
+   ```
+
+2. **Create a `.env` file** in the project root:
+   ```bash
+   ANTHROPIC_API_KEY=your_key_here
+   ```
+
+3. **Edit `docker-compose.yml`** directly (not recommended for secrets)
 
 ## Usage
 
