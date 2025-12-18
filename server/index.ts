@@ -10,8 +10,12 @@ import aiRouter from './routes/ai.js';
 import { workspaceService } from './services/workspaceService.js';
 
 // Seed data for first-time users
+// Note: The 'start' rule uses EOF to force the parser to consume all input.
+// Without EOF, ANTLR 4.7+ will silently stop parsing at the first error
+// and return a partial parse tree instead of reporting errors.
 const SEED_GRAMMAR = `grammar Expr;
 
+start:  expr EOF ;
 expr:   term (('+'|'-') term)* ;
 term:   factor (('*'|'/') factor)* ;
 factor: NUMBER | '(' expr ')' ;
@@ -124,7 +128,7 @@ async function createSeedData(): Promise<void> {
         await workspaceService.updateWorkspace({
             openTabs: [grammar.id, input.id],
             activeTabId: grammar.id,
-            settings: { startRule: 'expr' }
+            settings: { startRule: 'start' }
         });
         console.log('   ✓ Created workspace.json');
 
