@@ -169,6 +169,83 @@ fragment UNUSED_FRAG : '_' ;
       );
       expect(unusedFrags.map((r) => r.name)).toContain('UNUSED_FRAG');
     });
+
+    it('should not mark skip rules as unused', () => {
+      const grammar = `
+grammar Test;
+expr : ID ;
+ID : [a-z]+ ;
+WS : [ \\t\\r\\n]+ -> skip ;
+COMMENT : '//' ~[\\r\\n]* -> skip ;
+`;
+      const result = analyzer.analyze(grammar, { startRule: 'expr' });
+
+      const unusedNames = result.unusedRules.map(r => r.name);
+      expect(unusedNames).not.toContain('WS');
+      expect(unusedNames).not.toContain('COMMENT');
+    });
+
+    it('should not mark channel rules as unused', () => {
+      const grammar = `
+grammar Test;
+expr : ID ;
+ID : [a-z]+ ;
+WS : [ \\t\\r\\n]+ -> channel(HIDDEN) ;
+BLOCK_COMMENT : '/*' .*? '*/' -> channel(COMMENTS) ;
+`;
+      const result = analyzer.analyze(grammar, { startRule: 'expr' });
+
+      const unusedNames = result.unusedRules.map(r => r.name);
+      expect(unusedNames).not.toContain('WS');
+      expect(unusedNames).not.toContain('BLOCK_COMMENT');
+    });
+
+    it('should not mark mode-switching rules as unused', () => {
+      const grammar = `
+lexer grammar TestLexer;
+ID : [a-z]+ ;
+STRING_START : '"' -> pushMode(STRING_MODE) ;
+mode STRING_MODE;
+STRING_CONTENT : ~["]+ ;
+STRING_END : '"' -> popMode ;
+`;
+      const result = analyzer.analyze(grammar, { startRule: '' });
+
+      const unusedNames = result.unusedRules.map(r => r.name);
+      // Rules with pushMode/popMode should not be flagged
+      expect(unusedNames).not.toContain('STRING_START');
+      expect(unusedNames).not.toContain('STRING_END');
+    });
+
+    it('should not mark rules with mode() action as unused', () => {
+      const grammar = `
+lexer grammar TestLexer;
+ID : [a-z]+ ;
+ENTER_COMMENT : '/*' -> mode(COMMENT_MODE) ;
+mode COMMENT_MODE;
+COMMENT_CONTENT : . -> more ;
+EXIT_COMMENT : '*/' -> mode(DEFAULT_MODE) ;
+`;
+      const result = analyzer.analyze(grammar, { startRule: '' });
+
+      const unusedNames = result.unusedRules.map(r => r.name);
+      expect(unusedNames).not.toContain('ENTER_COMMENT');
+      expect(unusedNames).not.toContain('EXIT_COMMENT');
+      expect(unusedNames).not.toContain('COMMENT_CONTENT'); // has -> more
+    });
+
+    it('should not mark rules with type() action as unused', () => {
+      const grammar = `
+lexer grammar TestLexer;
+ID : [a-z]+ ;
+KEYWORD : 'if' | 'else' | 'while' ;
+ID_OR_KEYWORD : [a-z]+ -> type(ID) ;
+`;
+      const result = analyzer.analyze(grammar, { startRule: '' });
+
+      const unusedNames = result.unusedRules.map(r => r.name);
+      expect(unusedNames).not.toContain('ID_OR_KEYWORD');
+    });
   });
 
   describe('calculateComplexityMetrics', () => {
@@ -472,6 +549,77 @@ ID : [a-z]+ ;
       const result = analyzer.analyze(grammar, { detectAmbiguity: false });
 
       expect(result.ambiguityHints).toHaveLength(0);
+    });
+  });
+
+  describe('cross-file references', () => {
+    it('should not mark lexer tokens as unused when referenced in separate parser grammar', () => {
+      // Lexer grammar defines tokens
+      const lexerGrammar = `
+lexer grammar TestLexer;
+ID : [a-z]+ ;
+NUMBER : [0-9]+ ;
+PLUS : '+' ;
+WS : [ \\t\\r\\n]+ -> skip ;
+`;
+      // Parser grammar uses those tokens
+      const parserGrammar = `
+parser grammar TestParser;
+options { tokenVocab = TestLexer; }
+expr : term ((PLUS) term)* ;
+term : ID | NUMBER ;
+`;
+      // Analyze lexer grammar with parser grammar as additional context
+      const result = analyzer.analyze(lexerGrammar, { startRule: 'expr' }, [parserGrammar]);
+
+      // ID, NUMBER, and PLUS should NOT be marked as unused because they're used in parser
+      const unusedNames = result.unusedRules.map(r => r.name);
+      expect(unusedNames).not.toContain('ID');
+      expect(unusedNames).not.toContain('NUMBER');
+      expect(unusedNames).not.toContain('PLUS');
+    });
+
+    it('should still mark truly unused tokens when cross-file context is provided', () => {
+      const lexerGrammar = `
+lexer grammar TestLexer;
+ID : [a-z]+ ;
+NUMBER : [0-9]+ ;
+UNUSED_TOKEN : '###' ;
+WS : [ \\t\\r\\n]+ -> skip ;
+`;
+      const parserGrammar = `
+parser grammar TestParser;
+options { tokenVocab = TestLexer; }
+expr : ID | NUMBER ;
+`;
+      const result = analyzer.analyze(lexerGrammar, { startRule: 'expr' }, [parserGrammar]);
+
+      // UNUSED_TOKEN should still be marked as unused
+      const unusedNames = result.unusedRules.map(r => r.name);
+      expect(unusedNames).toContain('UNUSED_TOKEN');
+    });
+
+    it('should handle combined grammar with proper reference tracking', () => {
+      const combinedGrammar = `
+grammar Test;
+expr : term ((PLUS | MINUS) term)* ;
+term : ID | NUMBER ;
+ID : [a-z]+ ;
+NUMBER : [0-9]+ ;
+PLUS : '+' ;
+MINUS : '-' ;
+UNUSED : '?' ;
+`;
+      const result = analyzer.analyze(combinedGrammar, { startRule: 'expr' });
+
+      // Tokens used by parser rules should not be unused
+      const unusedNames = result.unusedRules.map(r => r.name);
+      expect(unusedNames).not.toContain('ID');
+      expect(unusedNames).not.toContain('NUMBER');
+      expect(unusedNames).not.toContain('PLUS');
+      expect(unusedNames).not.toContain('MINUS');
+      // But truly unused tokens should be flagged
+      expect(unusedNames).toContain('UNUSED');
     });
   });
 

@@ -27,7 +27,7 @@ export interface UseGrammarAnalysisReturn {
   /** Error message if analysis failed */
   error: string | null;
   /** Trigger manual analysis */
-  analyze: (grammarContent: string) => void;
+  analyze: (grammarContent: string, additionalGrammarContent?: string[]) => void;
   /** Clear analysis results */
   clearAnalysis: () => void;
   /** Get decorations for Monaco editor */
@@ -60,12 +60,13 @@ export function useGrammarAnalysis(
   const analyzerRef = useRef<GrammarAnalyzer>(grammarAnalyzer);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastGrammarRef = useRef<string>('');
+  const lastAdditionalRef = useRef<string[]>([]);
 
   /**
    * Perform analysis on grammar content
    */
   const performAnalysis = useCallback(
-    (grammarContent: string) => {
+    (grammarContent: string, additionalGrammarContent: string[] = []) => {
       if (!grammarContent.trim()) {
         setResult(null);
         setError(null);
@@ -78,10 +79,12 @@ export function useGrammarAnalysis(
       try {
         const analysisResult = analyzerRef.current.analyze(
           grammarContent,
-          analysisOptions
+          analysisOptions,
+          additionalGrammarContent
         );
         setResult(analysisResult);
         lastGrammarRef.current = grammarContent;
+        lastAdditionalRef.current = additionalGrammarContent;
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : 'Analysis failed';
@@ -98,24 +101,26 @@ export function useGrammarAnalysis(
    * Analyze grammar with optional debouncing
    */
   const analyze = useCallback(
-    (grammarContent: string) => {
+    (grammarContent: string, additionalGrammarContent: string[] = []) => {
       // Clear any pending debounce
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
       }
 
-      // Skip if content hasn't changed
-      if (grammarContent === lastGrammarRef.current && result) {
+      // Skip if content hasn't changed (check both main and additional content)
+      const additionalChanged = additionalGrammarContent.length !== lastAdditionalRef.current.length ||
+        additionalGrammarContent.some((c, i) => c !== lastAdditionalRef.current[i]);
+      if (grammarContent === lastGrammarRef.current && !additionalChanged && result) {
         return;
       }
 
       if (options.autoAnalyze && options.debounceMs && options.debounceMs > 0) {
         debounceTimerRef.current = setTimeout(() => {
-          performAnalysis(grammarContent);
+          performAnalysis(grammarContent, additionalGrammarContent);
         }, options.debounceMs);
       } else {
-        performAnalysis(grammarContent);
+        performAnalysis(grammarContent, additionalGrammarContent);
       }
     },
     [options.autoAnalyze, options.debounceMs, performAnalysis, result]

@@ -40,15 +40,19 @@ export class GrammarAnalyzer {
    * Main analysis method - analyzes grammar content and returns results
    * @param grammarContent - The full grammar file content
    * @param options - Analysis configuration options
+   * @param additionalGrammarContent - Additional grammar files for cross-file reference tracking
    * @returns Complete analysis result
    */
   public analyze(
     grammarContent: string,
-    options: AnalysisOptions = {}
+    options: AnalysisOptions = {},
+    additionalGrammarContent: string[] = []
   ): AnalysisResult {
     const startTime = performance.now();
     const mergedOptions = { ...DEFAULT_ANALYSIS_OPTIONS, ...options };
-    const grammarHash = this.hashGrammar(grammarContent);
+    // Include additional content in hash for cache invalidation
+    const allContent = [grammarContent, ...additionalGrammarContent].join('\n');
+    const grammarHash = this.hashGrammar(allContent);
 
     // Check cache
     const cached = this.getFromCache(grammarHash);
@@ -59,8 +63,15 @@ export class GrammarAnalyzer {
     // Parse grammar to extract rules
     const rules = this.parseGrammar(grammarContent);
 
-    // Build reference graph
-    const referenceGraph = this.buildReferenceGraph(rules);
+    // Parse additional grammars to get their rules for reference tracking
+    const additionalRules: RuleInfo[] = [];
+    for (const content of additionalGrammarContent) {
+      additionalRules.push(...this.parseGrammar(content));
+    }
+
+    // Build reference graph including all grammar rules
+    const allRulesForGraph = [...rules, ...additionalRules];
+    const referenceGraph = this.buildReferenceGraph(allRulesForGraph);
 
     // Update rules with reference information
     this.updateRuleReferences(rules, referenceGraph);
@@ -534,6 +545,17 @@ export class GrammarAnalyzer {
   }
 
   /**
+   * Check if a lexer rule has a special action that makes it intentionally unreferenced
+   * These include: -> skip, -> channel(...), -> mode(...), -> pushMode(...), -> popMode, -> more, -> type(...)
+   */
+  private hasSpecialLexerAction(ruleText: string): boolean {
+    // Match various lexer actions that indicate the rule is intentionally unreferenced:
+    // -> skip, -> more, -> popMode
+    // -> channel(HIDDEN), -> mode(INSIDE), -> pushMode(STRING), -> type(OTHER)
+    return /->[\s]*(skip|more|popMode|channel\s*\([^)]*\)|mode\s*\([^)]*\)|pushMode\s*\([^)]*\)|type\s*\([^)]*\))/i.test(ruleText);
+  }
+
+  /**
    * Detect unused rules (rules that are never referenced)
    */
   private detectUnusedRules(
@@ -554,6 +576,12 @@ export class GrammarAnalyzer {
 
       // Skip if referenced by any other rule
       if (node.referencedBy.size > 0) {
+        continue;
+      }
+
+      // Skip lexer rules with special actions (skip, channel, mode, pushMode, popMode, more, type)
+      // These are intentionally unreferenced (whitespace, comments, mode switching, etc.)
+      if (rule.type === 'lexer' && this.hasSpecialLexerAction(rule.text)) {
         continue;
       }
 

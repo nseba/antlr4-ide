@@ -232,12 +232,22 @@ const App: React.FC = () => {
 
   // Grammar analysis hook
   const mainGrammarFile = useMemo(() => files.find(f => f.type === 'grammar'), [files]);
+  const allGrammarFiles = useMemo(() => files.filter(f => f.type === 'grammar'), [files]);
   const {
     result: analysisResult,
     isAnalyzing,
-    analyze: runAnalysis,
+    analyze: runAnalysisInternal,
     getDecorations
   } = useGrammarAnalysis({ analysisOptions: { startRule } });
+
+  // Wrapper to pass all grammar files for cross-file reference tracking
+  const runAnalysis = useCallback((grammarContent: string) => {
+    // Get content of other grammar files for cross-reference checking
+    const additionalGrammarContent = allGrammarFiles
+      .filter(f => f.content !== grammarContent)
+      .map(f => f.content);
+    runAnalysisInternal(grammarContent, additionalGrammarContent);
+  }, [allGrammarFiles, runAnalysisInternal]);
 
   // Total issue count for badge display
   const totalAnalysisIssues = useMemo(() => {
